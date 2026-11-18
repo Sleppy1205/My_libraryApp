@@ -14,23 +14,50 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mylibrary.ui.components.FormField
 import com.example.mylibrary.ui.components.PasswordField
 import com.example.mylibrary.ui.components.ScreenContainer
 
+/** Único composable que conoce el ViewModel. */
 @Composable
-fun LoginScreen(onLogin: (String) -> Unit, onGoToRegister: () -> Unit) {
-    var email by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
-    var submitted by rememberSaveable { mutableStateOf(false) }
+fun LoginRoute(
+    factory: ViewModelProvider.Factory,
+    onLoggedIn: () -> Unit,
+    onGoToRegister: () -> Unit
+) {
+    val viewModel: LoginViewModel = viewModel(factory = factory)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    LaunchedEffect(state.loggedIn) {
+        if (state.loggedIn) onLoggedIn()
+    }
+
+    LoginScreen(
+        state = state,
+        onEmailChange = viewModel::onEmailChange,
+        onPasswordChange = viewModel::onPasswordChange,
+        onLoginClick = viewModel::onLoginClick,
+        onGoToRegister = onGoToRegister
+    )
+}
+
+/** Composable sin estado propio: solo recibe datos y lambdas. */
+@Composable
+fun LoginScreen(
+    state: LoginUiState,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onLoginClick: () -> Unit,
+    onGoToRegister: () -> Unit
+) {
     Scaffold { inner ->
         ScreenContainer(Modifier.padding(inner)) {
             Spacer(Modifier.height(32.dp))
@@ -47,22 +74,15 @@ fun LoginScreen(onLogin: (String) -> Unit, onGoToRegister: () -> Unit) {
             )
             Spacer(Modifier.height(24.dp))
             FormField(
-                value = email, onValueChange = { email = it }, label = "Correo electrónico",
-                error = if (submitted && email.isBlank()) "Campo obligatorio" else null,
-                keyboardType = KeyboardType.Email
+                value = state.email, onValueChange = onEmailChange, label = "Correo electrónico",
+                error = state.emailError, keyboardType = KeyboardType.Email
             )
             PasswordField(
-                value = password, onValueChange = { password = it }, label = "Contraseña",
-                error = if (submitted && password.isBlank()) "Campo obligatorio" else null
+                value = state.password, onValueChange = onPasswordChange, label = "Contraseña",
+                error = state.passwordError
             )
             Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = {
-                    submitted = true
-                    if (email.isNotBlank() && password.isNotBlank()) onLogin(email.trim())
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("Ingresar") }
+            Button(onClick = onLoginClick, modifier = Modifier.fillMaxWidth()) { Text("Ingresar") }
             Spacer(Modifier.height(8.dp))
             Text("¿No tienes cuenta?", style = MaterialTheme.typography.bodyMedium)
             TextButton(onClick = onGoToRegister) { Text("Crear cuenta") }

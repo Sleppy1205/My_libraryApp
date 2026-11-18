@@ -25,24 +25,44 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.mylibrary.model.AppSettings
 import com.example.mylibrary.model.SortOrder
 import com.example.mylibrary.ui.components.AppTopBar
 import com.example.mylibrary.ui.components.ScreenContainer
 
 @Composable
+fun SettingsRoute(
+    factory: ViewModelProvider.Factory,
+    onBack: () -> Unit,
+    onLogout: () -> Unit
+) {
+    val viewModel: SettingsViewModel = viewModel(factory = factory)
+    val settings by viewModel.uiState.collectAsStateWithLifecycle()
+
+    SettingsScreen(
+        settings = settings,
+        onDarkThemeChange = viewModel::onDarkThemeChange,
+        onSortOrderChange = viewModel::onSortOrderChange,
+        onLanguageChange = viewModel::onLanguageChange,
+        onBack = onBack,
+        onLogout = onLogout
+    )
+}
+
+@Composable
 fun SettingsScreen(
-    userName: String,
-    userEmail: String,
-    darkTheme: Boolean,
+    settings: AppSettings,
     onDarkThemeChange: (Boolean) -> Unit,
-    sortOrder: SortOrder,
     onSortOrderChange: (SortOrder) -> Unit,
-    language: String,
     onLanguageChange: (String) -> Unit,
     onBack: () -> Unit,
     onLogout: () -> Unit
@@ -59,14 +79,14 @@ fun SettingsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    userName.firstOrNull()?.uppercase() ?: "?",
+                    settings.userName.firstOrNull()?.uppercase() ?: "?",
                     style = MaterialTheme.typography.titleLarge
                 )
             }
             Spacer(Modifier.height(8.dp))
-            Text(userName, style = MaterialTheme.typography.titleMedium)
+            Text(settings.userName, style = MaterialTheme.typography.titleMedium)
             Text(
-                userEmail, style = MaterialTheme.typography.bodyMedium,
+                settings.userEmail, style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
@@ -74,7 +94,7 @@ fun SettingsScreen(
             ListItem(
                 headlineContent = { Text("Tema oscuro") },
                 supportingContent = { Text("Cambia la apariencia de la app") },
-                trailingContent = { Switch(checked = darkTheme, onCheckedChange = onDarkThemeChange) },
+                trailingContent = { Switch(checked = settings.darkTheme, onCheckedChange = onDarkThemeChange) },
                 colors = transparent
             )
             HorizontalDivider()
@@ -89,7 +109,7 @@ fun SettingsScreen(
             ) {
                 SortOrder.values().forEach { o ->
                     FilterChip(
-                        selected = sortOrder == o,
+                        selected = settings.sortOrder == o,
                         onClick = { onSortOrderChange(o) },
                         label = { Text(o.label) }
                     )
@@ -108,7 +128,7 @@ fun SettingsScreen(
             ) {
                 listOf("Español", "English").forEach { l ->
                     FilterChip(
-                        selected = language == l,
+                        selected = settings.language == l,
                         onClick = { onLanguageChange(l) },
                         label = { Text(l) }
                     )
