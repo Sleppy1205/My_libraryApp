@@ -1,34 +1,24 @@
 package com.example.mylibrary.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.mylibrary.data.SampleData
-import com.example.mylibrary.model.CoverColors
-import com.example.mylibrary.model.SortOrder
-import com.example.mylibrary.ui.screens.BookDetailScreen
-import com.example.mylibrary.ui.screens.BookFormScreen
-import com.example.mylibrary.ui.screens.LibraryScreen
-import com.example.mylibrary.ui.screens.LoginScreen
-import com.example.mylibrary.ui.screens.RegisterScreen
-import com.example.mylibrary.ui.screens.SettingsScreen
+import com.example.mylibrary.di.AppViewModelFactory
+import com.example.mylibrary.ui.screens.BookDetailRoute
+import com.example.mylibrary.ui.screens.BookFormRoute
+import com.example.mylibrary.ui.screens.LibraryRoute
+import com.example.mylibrary.ui.screens.LoginRoute
+import com.example.mylibrary.ui.screens.NEW_BOOK_ID
+import com.example.mylibrary.ui.screens.RegisterRoute
+import com.example.mylibrary.ui.screens.SettingsRoute
 import com.example.mylibrary.ui.screens.SplashScreen
 
 @Composable
-fun AppNavigation(darkTheme: Boolean, onDarkThemeChange: (Boolean) -> Unit) {
+fun AppNavigation(factory: AppViewModelFactory) {
     val navController = rememberNavController()
-    val books = SampleData.books
-    var sortOrder by rememberSaveable { mutableStateOf(SortOrder.RECIENTES) }
-    var language by rememberSaveable { mutableStateOf("Español") }
-    var userName by rememberSaveable { mutableStateOf("") }
-    var userEmail by rememberSaveable { mutableStateOf("") }
 
     val goToLibrary: () -> Unit = {
         navController.navigate(Routes.LIBRARY) {
@@ -47,35 +37,26 @@ fun AppNavigation(darkTheme: Boolean, onDarkThemeChange: (Boolean) -> Unit) {
         }
 
         composable(Routes.LOGIN) {
-            LoginScreen(
-                onLogin = { email ->
-                    if (email != userEmail) {
-                        userEmail = email
-                        userName = email.substringBefore("@").replaceFirstChar { it.uppercase() }
-                    }
-                    goToLibrary()
-                },
+            LoginRoute(
+                factory = factory.login,
+                onLoggedIn = goToLibrary,
                 onGoToRegister = { navController.navigate(Routes.REGISTER) }
             )
         }
 
         composable(Routes.REGISTER) {
-            RegisterScreen(
+            RegisterRoute(
+                factory = factory.register,
                 onBack = { navController.popBackStack() },
-                onRegistered = { name, email ->
-                    userName = name
-                    userEmail = email
-                    goToLibrary()
-                }
+                onRegistered = goToLibrary
             )
         }
 
         composable(Routes.LIBRARY) {
-            LibraryScreen(
-                books = books,
-                sortOrder = sortOrder,
+            LibraryRoute(
+                factory = factory.library,
                 onBookClick = { navController.navigate(Routes.detail(it)) },
-                onAddBook = { navController.navigate(Routes.form(-1)) },
+                onAddBook = { navController.navigate(Routes.form(NEW_BOOK_ID)) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) }
             )
         }
@@ -84,19 +65,11 @@ fun AppNavigation(darkTheme: Boolean, onDarkThemeChange: (Boolean) -> Unit) {
             route = Routes.DETAIL,
             arguments = listOf(navArgument("bookId") { type = NavType.IntType })
         ) { entry ->
-            val id = entry.arguments?.getInt("bookId") ?: -1
-            BookDetailScreen(
-                book = books.find { it.id == id },
+            val id = entry.arguments?.getInt("bookId") ?: NEW_BOOK_ID
+            BookDetailRoute(
+                factory = factory.detail(id),
                 onBack = { navController.popBackStack() },
-                onEdit = { navController.navigate(Routes.form(id)) },
-                onUpdate = { updated ->
-                    val i = books.indexOfFirst { it.id == updated.id }
-                    if (i >= 0) books[i] = updated
-                },
-                onDelete = {
-                    books.removeAll { it.id == id }
-                    navController.popBackStack()
-                }
+                onEdit = { navController.navigate(Routes.form(it)) }
             )
         }
 
@@ -104,33 +77,16 @@ fun AppNavigation(darkTheme: Boolean, onDarkThemeChange: (Boolean) -> Unit) {
             route = Routes.FORM,
             arguments = listOf(navArgument("bookId") { type = NavType.IntType })
         ) { entry ->
-            val id = entry.arguments?.getInt("bookId") ?: -1
-            BookFormScreen(
-                existing = books.find { it.id == id },
-                onBack = { navController.popBackStack() },
-                onSave = { book ->
-                    val i = books.indexOfFirst { it.id == book.id }
-                    if (i >= 0) {
-                        books[i] = book
-                    } else {
-                        val newId = SampleData.nextId()
-                        books.add(book.copy(id = newId, coverColor = CoverColors[newId % CoverColors.size]))
-                    }
-                    navController.popBackStack()
-                }
+            val id = entry.arguments?.getInt("bookId") ?: NEW_BOOK_ID
+            BookFormRoute(
+                factory = factory.form(id),
+                onBack = { navController.popBackStack() }
             )
         }
 
         composable(Routes.SETTINGS) {
-            SettingsScreen(
-                userName = userName,
-                userEmail = userEmail,
-                darkTheme = darkTheme,
-                onDarkThemeChange = onDarkThemeChange,
-                sortOrder = sortOrder,
-                onSortOrderChange = { sortOrder = it },
-                language = language,
-                onLanguageChange = { language = it },
+            SettingsRoute(
+                factory = factory.settings,
                 onBack = { navController.popBackStack() },
                 onLogout = {
                     navController.navigate(Routes.LOGIN) {
