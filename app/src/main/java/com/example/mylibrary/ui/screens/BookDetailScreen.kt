@@ -29,6 +29,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -37,6 +38,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mylibrary.model.Book
 import com.example.mylibrary.model.ReadingStatus
 import com.example.mylibrary.ui.components.AppTopBar
@@ -46,14 +50,41 @@ import com.example.mylibrary.ui.components.ScreenContainer
 import com.example.mylibrary.ui.theme.Terracotta
 
 @Composable
+fun BookDetailRoute(
+    factory: ViewModelProvider.Factory,
+    onBack: () -> Unit,
+    onEdit: (Int) -> Unit
+) {
+    val viewModel: BookDetailViewModel = viewModel(factory = factory)
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // Cuando el libro se elimina, se vuelve a la pantalla anterior.
+    LaunchedEffect(state.deleted) {
+        if (state.deleted) onBack()
+    }
+
+    BookDetailScreen(
+        book = state.book,
+        onBack = onBack,
+        onEdit = { state.book?.let { onEdit(it.id) } },
+        onToggleFavorite = viewModel::onToggleFavorite,
+        onRatingChange = viewModel::onRatingChange,
+        onStatusChange = viewModel::onStatusChange,
+        onDelete = viewModel::onDelete
+    )
+}
+
+@Composable
 fun BookDetailScreen(
     book: Book?,
     onBack: () -> Unit,
     onEdit: () -> Unit,
-    onUpdate: (Book) -> Unit,
+    onToggleFavorite: () -> Unit,
+    onRatingChange: (Int) -> Unit,
+    onStatusChange: (ReadingStatus) -> Unit,
     onDelete: () -> Unit
 ) {
-    // Mientras se cierra la pantalla tras eliminar, el libro ya no existe.
+    // Mientras carga, o justo después de eliminar, no hay libro que mostrar.
     if (book == null) {
         Box(Modifier.fillMaxSize())
         return
@@ -66,7 +97,7 @@ fun BookDetailScreen(
                 title = "Detalle",
                 onBack = onBack,
                 actions = {
-                    IconButton(onClick = { onUpdate(book.copy(favorite = !book.favorite)) }) {
+                    IconButton(onClick = onToggleFavorite) {
                         Icon(
                             imageVector = if (book.favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                             contentDescription = "Marcar como favorito",
@@ -91,7 +122,7 @@ fun BookDetailScreen(
                 textAlign = TextAlign.Center
             )
             Spacer(Modifier.height(8.dp))
-            RatingBar(rating = book.rating) { onUpdate(book.copy(rating = it)) }
+            RatingBar(rating = book.rating, onRatingChange = onRatingChange)
             Spacer(Modifier.height(8.dp))
 
             Text(
@@ -105,7 +136,7 @@ fun BookDetailScreen(
                 ReadingStatus.values().forEach { s ->
                     FilterChip(
                         selected = book.status == s,
-                        onClick = { onUpdate(book.copy(status = s)) },
+                        onClick = { onStatusChange(s) },
                         label = { Text(s.label) }
                     )
                 }
